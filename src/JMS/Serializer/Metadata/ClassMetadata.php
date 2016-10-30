@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright 2013 Johannes M. Schmitt <schmittjoh@gmail.com>
+ * Copyright 2016 Johannes M. Schmitt <schmittjoh@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,12 +83,12 @@ class ClassMetadata extends MergeableClassMetadata
      */
     public function setAccessorOrder($order, array $customOrder = array())
     {
-        if (!in_array($order, array(self::ACCESSOR_ORDER_UNDEFINED, self::ACCESSOR_ORDER_ALPHABETICAL, self::ACCESSOR_ORDER_CUSTOM), true)) {
+        if ( ! in_array($order, array(self::ACCESSOR_ORDER_UNDEFINED, self::ACCESSOR_ORDER_ALPHABETICAL, self::ACCESSOR_ORDER_CUSTOM), true)) {
             throw new InvalidArgumentException(sprintf('The accessor order "%s" is invalid.', $order));
         }
 
         foreach ($customOrder as $name) {
-            if (!is_string($name)) {
+            if ( ! is_string($name)) {
                 throw new InvalidArgumentException(sprintf('$customOrder is expected to be a list of strings, but got element of value %s.', json_encode($name)));
             }
         }
@@ -158,6 +158,19 @@ class ClassMetadata extends MergeableClassMetadata
                 $this->discriminatorBaseClass,
                 $this->discriminatorBaseClass
             ));
+        } elseif ( ! $this->discriminatorFieldName && $object->discriminatorFieldName) {
+            $this->discriminatorFieldName = $object->discriminatorFieldName;
+            $this->discriminatorMap = $object->discriminatorMap;
+        }
+
+        if ($object->discriminatorDisabled !== null) {
+            $this->discriminatorDisabled = $object->discriminatorDisabled;
+        }
+
+        if ($object->discriminatorMap) {
+            $this->discriminatorFieldName = $object->discriminatorFieldName;
+            $this->discriminatorMap = $object->discriminatorMap;
+            $this->discriminatorBaseClass = $object->discriminatorBaseClass;
         }
 
         if ($object->discriminatorMap) {
@@ -202,12 +215,12 @@ class ClassMetadata extends MergeableClassMetadata
 
     public function registerNamespace($uri, $prefix = null)
     {
-        if (!is_string($uri)) {
+        if ( ! is_string($uri)) {
             throw new InvalidArgumentException(sprintf('$uri is expected to be a strings, but got value %s.', json_encode($uri)));
         }
 
-        if ($prefix !== null ) {
-            if (!is_string($prefix)) {
+        if ($prefix !== null) {
+            if ( ! is_string($prefix)) {
                 throw new InvalidArgumentException(sprintf('$prefix is expected to be a strings, but got value %s.', json_encode($prefix)));
             }
         } else {
@@ -273,19 +286,20 @@ class ClassMetadata extends MergeableClassMetadata
 
             case self::ACCESSOR_ORDER_CUSTOM:
                 $order = $this->customOrder;
-                uksort($this->propertyMetadata, function($a, $b) use ($order) {
+                $currentSorting = $this->propertyMetadata ? array_combine(array_keys($this->propertyMetadata), range(1, count($this->propertyMetadata))) : [];
+                uksort($this->propertyMetadata, function($a, $b) use ($order, $currentSorting) {
                     $existsA = isset($order[$a]);
                     $existsB = isset($order[$b]);
 
-                    if (!$existsA && !$existsB) {
-                        return 0;
+                    if ( ! $existsA && ! $existsB) {
+                        return $currentSorting[$a] - $currentSorting[$b];
                     }
 
-                    if (!$existsA) {
+                    if ( ! $existsA) {
                         return 1;
                     }
 
-                    if (!$existsB) {
+                    if ( ! $existsB) {
                         return -1;
                     }
 

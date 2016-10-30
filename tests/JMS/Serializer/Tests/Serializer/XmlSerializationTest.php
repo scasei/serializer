@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright 2013 Johannes M. Schmitt <schmittjoh@gmail.com>
+ * Copyright 2016 Johannes M. Schmitt <schmittjoh@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ namespace JMS\Serializer\Tests\Serializer;
 use JMS\Serializer\Construction\UnserializeObjectConstructor;
 use JMS\Serializer\Handler\DateHandler;
 use JMS\Serializer\Handler\HandlerRegistry;
+use JMS\Serializer\Naming\CamelCaseNamingStrategy;
+use JMS\Serializer\Naming\SerializedNameAnnotationStrategy;
 use JMS\Serializer\SerializationContext;
 use JMS\Serializer\Serializer;
 use JMS\Serializer\Tests\Fixtures\InvalidUsageOfXmlValue;
@@ -35,6 +37,9 @@ use JMS\Serializer\Tests\Fixtures\ObjectWithXmlRootNamespace;
 use JMS\Serializer\Tests\Fixtures\Input;
 use JMS\Serializer\Tests\Fixtures\SimpleClassObject;
 use JMS\Serializer\Tests\Fixtures\SimpleSubClassObject;
+use JMS\Serializer\Tests\Fixtures\ObjectWithNamespacesAndList;
+use JMS\Serializer\XmlSerializationVisitor;
+use PhpCollection\Map;
 
 class XmlSerializationTest extends BaseSerializationTest
 {
@@ -159,6 +164,33 @@ class XmlSerializationTest extends BaseSerializationTest
             $this->serialize(new ObjectWithVirtualXmlProperties(), SerializationContext::create()->setGroups(array('map')))
         );
     }
+    public function testObjectWithNamespacesAndList()
+    {
+        $object = new ObjectWithNamespacesAndList();
+        $object->name = 'name';
+        $object->nameAlternativeB = 'nameB';
+
+        $object->phones = array('111', '222');
+        $object->addresses = array('A'=>'Street 1', 'B'=>'Street 2');
+
+        $object->phonesAlternativeB = array('555', '666');
+        $object->addressesAlternativeB = array('A'=>'Street 5', 'B'=>'Street 6');
+
+        $object->phonesAlternativeC = array('777', '888');
+        $object->addressesAlternativeC = array('A'=>'Street 7', 'B'=>'Street 8');
+
+        $object->phonesAlternativeD = array('999', 'AAA');
+        $object->addressesAlternativeD = array('A'=>'Street 9', 'B'=>'Street A');
+
+        $this->assertEquals(
+            $this->getContent('object_with_namespaces_and_list'),
+            $this->serialize($object, SerializationContext::create())
+        );
+        $this->assertEquals(
+            $object,
+            $this->deserialize($this->getContent('object_with_namespaces_and_list'), get_class($object))
+        );
+    }
 
     public function testArrayKeyValues()
     {
@@ -247,8 +279,35 @@ class XmlSerializationTest extends BaseSerializationTest
         $childObject->baz = 'baz';
         $childObject->qux = 'qux';
 
-
         $this->assertEquals($this->getContent('simple_subclass_object'), $this->serialize($childObject));
+    }
+
+    public function testWithoutFormatedOutputByXmlSerializationVisitor()
+    {
+        $namingStrategy = new SerializedNameAnnotationStrategy(new CamelCaseNamingStrategy());
+        $xmlVisitor = new XmlSerializationVisitor($namingStrategy);
+        $xmlVisitor->setFormatOutput(false);
+
+        $visitors = new Map(array(
+            'xml'  => new XmlSerializationVisitor($namingStrategy),
+        ));
+
+        $serializer = new Serializer(
+            $this->factory,
+            $this->handlerRegistry,
+            new UnserializeObjectConstructor(),
+            $visitors,
+            $this->deserializationVisitors,
+            $this->dispatcher
+        );
+
+        $object = new SimpleClassObject;
+        $object->foo = 'foo';
+        $object->bar = 'bar';
+        $object->moo = 'moo';
+
+        $stringXml = $serializer->serialize($object, $this->getFormat());
+        $this->assertXmlStringEqualsXmlString($this->getContent('simple_class_object_minified'), $stringXml);
     }
 
     private function xpathFirstToString(\SimpleXMLElement $xml, $xpath)

@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Copyright 2013 Johannes M. Schmitt <schmittjoh@gmail.com>
+ * Copyright 2016 Johannes M. Schmitt <schmittjoh@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,10 +81,11 @@ class YamlSerializationVisitor extends AbstractVisitor
     public function visitArray($data, array $type, Context $context)
     {
         $count = $this->writer->changeCount;
-        $isList = array_keys($data) === range(0, count($data) - 1);
+        $isList = (isset($type['params'][0]) && ! isset($type['params'][1]))
+            || array_keys($data) === range(0, count($data) - 1);
 
         foreach ($data as $k => $v) {
-            if (null === $v && (!is_string($k) || ! $context->shouldSerializeNull())) {
+            if (null === $v && $context->shouldSerializeNull() !== true) {
                 continue;
             }
 
@@ -110,6 +111,11 @@ class YamlSerializationVisitor extends AbstractVisitor
             $this->writer
                 ->rtrim(false)
                 ->writeln(' {}')
+            ;
+        } elseif (empty($data)) {
+            $this->writer
+                ->rtrim(false)
+                ->writeln(' []')
             ;
         }
     }
@@ -155,13 +161,13 @@ class YamlSerializationVisitor extends AbstractVisitor
     {
         $v = $metadata->getValue($data);
 
-        if (null === $v && !$context->shouldSerializeNull()) {
+        if (null === $v && $context->shouldSerializeNull() !== true) {
             return;
         }
 
         $name = $this->namingStrategy->translateName($metadata);
 
-        if (!$metadata->inline) {
+        if ( ! $metadata->inline) {
             $this->writer
                  ->writeln(Inline::dump($name).':')
                  ->indent();
@@ -176,11 +182,11 @@ class YamlSerializationVisitor extends AbstractVisitor
                 ->rtrim(false)
                 ->writeln(' '.$v)
             ;
-        } elseif ($count === $this->writer->changeCount && !$metadata->inline) {
+        } elseif ($count === $this->writer->changeCount && ! $metadata->inline) {
             $this->writer->revert();
         }
 
-        if (!$metadata->inline) {
+        if ( ! $metadata->inline) {
             $this->writer->outdent();
         }
         $this->revertCurrentMetadata();
